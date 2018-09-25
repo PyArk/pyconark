@@ -1,26 +1,32 @@
-FROM python:3.6.6
+#	Copyright 2015, Google, Inc.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-ARG github_token
+# [START docker]
 
-# Clone our private GitHub Repository
-RUN git clone https://${github_token}:x-oauth-basic@github.com/PyArk/pyconark /pyconark/
+# The Google App Engine python runtime is Debian Jessie with Python installed
+# and various os-level packages to allow installation of popular Python
+# libraries. The source is on github at:
+# https://github.com/GoogleCloudPlatform/python-docker
+FROM gcr.io/google_appengine/python
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+# Create a virtualenv for the application dependencies.
+# # If you want to use Python 2, use the -p python2.7 flag.
+RUN virtualenv -p python3 /env
+ENV PATH /env/bin:$PATH
 
-#install requirements
-WORKDIR /pyconark
-COPY requirements.txt ./
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+ADD requirements.txt /app/requirements.txt
+RUN /env/bin/pip install --upgrade pip && /env/bin/pip install -r /app/requirements.txt
+ADD . /app
 
-#make and run migrate scripts for DB
-RUN python manage.py makemigrations
-RUN python manage.py migrate
-
-COPY . .
-#start django
-EXPOSE 80
-CMD ["python", "manage.py", "runserver", "0.0.0.0:80"]
+CMD gunicorn -b :$PORT pyconark.wsgi
+# [END docker]
